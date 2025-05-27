@@ -1,10 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 import numpy as np
 import pandas as pd
 import joblib
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List
 
 app = FastAPI()
+
+# Allow frontend to communicate (adjust origins as needed)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or replace "*" with specific domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class DengueInput(BaseModel):
@@ -19,7 +30,6 @@ class DengueInput(BaseModel):
     population: int
 
 
-# Shared config
 scaler_vars = [
     'temp_avg',
     'humidity_avg',
@@ -38,7 +48,6 @@ feature_order = [
     "precipitation_avg_ordinary_kriging_lag3", "precipitation_avg_ordinary_kriging_lag4"
 ]
 
-# Load models and scalers
 models = {
     "week1": {
         "model": joblib.load("models/model1/model.pkl"),
@@ -83,14 +92,44 @@ def prepare_input(data: dict) -> pd.DataFrame:
     return df
 
 
-def predict(model_key: str, input_data: DengueInput):
+def predict(model_key: str, input_data: dict):
     config = models[model_key]
-    df = prepare_input(input_data.dict())
+    df = prepare_input(input_data)
     df[scaler_vars] = config["feature_scaler"].transform(df[scaler_vars])
     df = df[feature_order]
     scaled_pred = config["model"].predict(df)
     pred = config["target_scaler"].inverse_transform(np.array(scaled_pred).reshape(-1, 1)).flatten()
     return round(pred[0])
+
+
+@app.post("/bulk-predict")
+async def bulk_predict(file: UploadFile = File(...)):
+    df = pd.read_csv(file.file)
+
+    required_columns = {
+        "week", "temp_avg", "humidity_avg", "vim", "cases_lag0",
+        "cases_lag1", "precipitation_avg_ordinary_kriging_lag3",
+        "precipitation_avg_ordinary_kriging_lag4", "population"
+    }
+
+    if not required_columns.issubset(df.columns):
+        return {"error": "Missing one or more required columns."}
+
+    results = []
+    for _, row in df.iterrows():
+        row_data = row.to_dict()
+        try:
+            week1_pred = predict("week1", row_data)
+            week2_pred = predict("week2", row_data)
+            results.append({
+                **row_data,
+                "prediction_week1": week1_pred,
+                "prediction_week2": week2_pred
+            })
+        except Exception as e:
+            results.append({**row_data, "error": str(e)})
+
+    return results
 
 
 @app.get("/test")
