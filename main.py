@@ -230,3 +230,22 @@ def predict_week2(data: DengueInput):
 @app.post("/predict-rio-week2")
 def predict_rio_week2(data: DengueCityInput):
     return {"prediction": predict_city_week2(data.dict())}
+
+
+@app.post("/bulk-predict-json")
+async def bulk_predict_json(data: List[DengueCityInput]):
+    results = []
+    for item in data:
+        row_data = item.dict()
+        try:
+            pred = predict_city_week2(row_data)
+            results.append({
+                **row_data,
+                "prediction": pred
+            })
+        except Exception as e:
+            results.append({
+                **row_data,
+                "error": str(e)
+            })
+    return {"predictions": results}
