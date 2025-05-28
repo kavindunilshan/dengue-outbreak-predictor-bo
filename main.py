@@ -110,9 +110,6 @@ def prepare_input(data: dict) -> pd.DataFrame:
     week_sin = np.sin(week_angle)
     week_cos = np.cos(week_angle)
 
-    # print data dict
-    print("Input Data:", data)
-
     df = pd.DataFrame([{
         "week": data["week"],
         "cases_per_100k": cases_per_100k,
@@ -167,12 +164,8 @@ def prepare_city_input(data: dict) -> pd.DataFrame:
 def predict(model_key: str, input_data: dict):
     config = models[model_key]
     df = prepare_input(input_data)
-
-    print("DataFrame columns:", df.columns)
-    print("DataFrame values:\n", df)
-
-
     df[scaler_vars] = config["feature_scaler"].transform(df[scaler_vars])
+
     df = df[feature_order]
     scaled_pred = config["model"].predict(df)
     pred = config["target_scaler"].inverse_transform(np.array(scaled_pred).reshape(-1, 1)).flatten()
@@ -217,8 +210,6 @@ async def bulk_predict(file: UploadFile = File(...)):
             results.append({**row_data, "error": str(e)})
 
     return results
-
-print(specific_model_config["model"].feature_name())
 
 
 @app.get("/test")
