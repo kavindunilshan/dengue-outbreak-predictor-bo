@@ -110,6 +110,9 @@ def prepare_input(data: dict) -> pd.DataFrame:
     week_sin = np.sin(week_angle)
     week_cos = np.cos(week_angle)
 
+    # print data dict
+    print("Input Data:", data)
+
     df = pd.DataFrame([{
         "week": data["week"],
         "cases_per_100k": cases_per_100k,
@@ -125,7 +128,7 @@ def prepare_input(data: dict) -> pd.DataFrame:
         "precipitation_avg_ordinary_kriging_lag3": data["precipitation_avg_ordinary_kriging_lag3"],
         "precipitation_avg_ordinary_kriging_lag4": data["precipitation_avg_ordinary_kriging_lag4"]
     }])
-    return df
+    return df[feature_order]
 
 
 def prepare_city_input(data: dict) -> pd.DataFrame:
@@ -164,6 +167,11 @@ def prepare_city_input(data: dict) -> pd.DataFrame:
 def predict(model_key: str, input_data: dict):
     config = models[model_key]
     df = prepare_input(input_data)
+
+    print("DataFrame columns:", df.columns)
+    print("DataFrame values:\n", df)
+
+
     df[scaler_vars] = config["feature_scaler"].transform(df[scaler_vars])
     df = df[feature_order]
     scaled_pred = config["model"].predict(df)
@@ -231,6 +239,3 @@ def predict_week2(data: DengueInput):
 @app.post("/predict-rio-week2")
 def predict_rio_week2(data: DengueCityInput):
     return {"prediction": predict_city_week2(data.dict())}
-
-feature_order = specific_model_config["feature_scaler"].feature_names_in_
-print(feature_order)
